@@ -25,7 +25,7 @@
         modRoot = "./go";
         subPackages = [ "cmd/dolt" ];
         # Have to update every time the go dependencies change.
-        vendorHash = "sha256-sWzZNyLUGgf90SwHrPkFOXskMNhBRqeT+i9ySjURz5Q=";
+        vendorHash = "sha256-jEy0dWCq+xR0xb+pFONMYO60dzZzURJNEHvccqjsxCo=";
         proxyVendor = true;
         doCheck = false;
 
