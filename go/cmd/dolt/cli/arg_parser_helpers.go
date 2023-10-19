@@ -102,9 +102,10 @@ func CreateMergeArgParser() *argparser.ArgParser {
 }
 
 func CreatePushArgParser() *argparser.ArgParser {
-	ap := argparser.NewArgParserWithMaxArgs("push", 2)
+	ap := argparser.NewArgParserWithVariableArgs("push")
 	ap.SupportsFlag(SetUpstreamFlag, "u", "For every branch that is up to date or successfully pushed, add upstream (tracking) reference, used by argument-less {{.EmphasisLeft}}dolt pull{{.EmphasisRight}} and other commands.")
 	ap.SupportsFlag(ForceFlag, "f", "Update the remote with local history, overwriting any conflicting history in the remote.")
+	ap.SupportsFlag(AllFlag, "", "Push all branches.")
 	return ap
 }
 
@@ -151,7 +152,7 @@ func CreateCleanArgParser() *argparser.ArgParser {
 
 func CreateCheckoutArgParser() *argparser.ArgParser {
 	ap := argparser.NewArgParserWithVariableArgs("checkout")
-	ap.SupportsString(CheckoutCoBranch, "", "branch", "Create a new branch named {{.LessThan}}new_branch{{.GreaterThan}} and start it at {{.LessThan}}start_point{{.GreaterThan}}.")
+	ap.SupportsString(CheckoutCreateBranch, "", "branch", "Create a new branch named {{.LessThan}}new_branch{{.GreaterThan}} and start it at {{.LessThan}}start_point{{.GreaterThan}}.")
 	ap.SupportsFlag(ForceFlag, "f", "If there is any changes in working set, the force flag will wipe out the current changes and checkout the new branch.")
 	ap.SupportsString(TrackFlag, "t", "", "When creating a new branch, set up 'upstream' configuration.")
 	return ap

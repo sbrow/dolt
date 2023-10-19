@@ -39,6 +39,7 @@ import (
 	"github.com/dolthub/dolt/go/libraries/doltcore/schema"
 	"github.com/dolthub/dolt/go/libraries/doltcore/schema/typeinfo"
 	"github.com/dolthub/dolt/go/libraries/doltcore/sqle/dsess"
+	"github.com/dolthub/dolt/go/libraries/doltcore/sqle/dtables"
 	"github.com/dolthub/dolt/go/libraries/doltcore/sqle/index"
 	"github.com/dolthub/dolt/go/libraries/doltcore/sqle/sqlutil"
 	"github.com/dolthub/dolt/go/libraries/doltcore/sqle/writer"
@@ -73,6 +74,8 @@ func init() {
 		MinRowsPerPartition = 2
 	}
 }
+
+var _ dtables.VersionableTable = (*DoltTable)(nil)
 
 // DoltTable implements the sql.Table interface and gives access to dolt table rows and schema.
 type DoltTable struct {
@@ -120,7 +123,7 @@ func NewDoltTable(name string, sch schema.Schema, tbl *doltdb.Table, db dsess.Sq
 // LockedToRoot returns a version of this table with its root value locked to the given value. The table's values will
 // not change as the session's root value changes. Appropriate for AS OF queries, or other use cases where the table's
 // values should not change throughout execution of a session.
-func (t *DoltTable) LockedToRoot(ctx *sql.Context, root *doltdb.RootValue) (*DoltTable, error) {
+func (t *DoltTable) LockedToRoot(ctx *sql.Context, root *doltdb.RootValue) (sql.IndexAddressableTable, error) {
 	tbl, ok, err := root.GetTable(ctx, t.tableName)
 	if err != nil {
 		return nil, err
@@ -394,44 +397,18 @@ func (t *DoltTable) IsTemporary() bool {
 
 // DataLength implements the sql.StatisticsTable interface.
 func (t *DoltTable) DataLength(ctx *sql.Context) (uint64, error) {
-	schema := t.Schema()
-	var numBytesPerRow uint64 = 0
-	for _, col := range schema {
-		switch n := col.Type.(type) {
-		case sql.NumberType:
-			numBytesPerRow += 8
-		case sql.StringType:
-			numBytesPerRow += uint64(n.MaxByteLength())
-		case sqltypes.BitType:
-			numBytesPerRow += 1
-		case sql.DatetimeType:
-			numBytesPerRow += 8
-		case sql.DecimalType:
-			numBytesPerRow += uint64(n.MaximumScale())
-		case sql.EnumType:
-			numBytesPerRow += 2
-		case sqltypes.JsonType:
-			numBytesPerRow += 20
-		case sql.NullType:
-			numBytesPerRow += 1
-		case sqltypes.TimeType:
-			numBytesPerRow += 16
-		case sql.YearType:
-			numBytesPerRow += 8
-		}
-	}
-
+	numBytesPerRow := schema.SchemaAvgLength(t.Schema())
 	numRows, err := t.numRows(ctx)
 	if err != nil {
 		return 0, err
 	}
-
 	return numBytesPerRow * numRows, nil
 }
 
 // RowCount implements the sql.StatisticsTable interface.
-func (t *DoltTable) RowCount(ctx *sql.Context) (uint64, error) {
-	return t.numRows(ctx)
+func (t *DoltTable) RowCount(ctx *sql.Context) (uint64, bool, error) {
+	rows, err := t.numRows(ctx)
+	return rows, true, err
 }
 
 func (t *DoltTable) PrimaryKeySchema() sql.PrimaryKeySchema {
@@ -994,6 +971,15 @@ func checksInSchema(sch schema.Schema) []sql.CheckDefinition {
 		}
 	}
 	return checks
+}
+
+// GetForeignKeyEditor implements sql.ForeignKeyTable
+func (t *WritableDoltTable) GetForeignKeyEditor(ctx *sql.Context) sql.ForeignKeyEditor {
+	te, err := t.getTableEditor(ctx)
+	if err != nil {
+		return sqlutil.NewStaticErrorEditor(err)
+	}
+	return te
 }
 
 // GetDeclaredForeignKeys implements sql.ForeignKeyTable
@@ -2674,15 +2660,6 @@ func (t *AlterableDoltTable) CreateIndexForForeignKey(ctx *sql.Context, idx sql.
 		return err
 	}
 	return t.updateFromRoot(ctx, newRoot)
-}
-
-// GetForeignKeyEditor implements sql.ForeignKeyTable
-func (t *AlterableDoltTable) GetForeignKeyEditor(ctx *sql.Context) sql.ForeignKeyEditor {
-	te, err := t.getTableEditor(ctx)
-	if err != nil {
-		return sqlutil.NewStaticErrorEditor(err)
-	}
-	return te
 }
 
 // toForeignKeyConstraint converts a Dolt resolved foreign key to a GMS foreign key. If the key is unresolved, then this

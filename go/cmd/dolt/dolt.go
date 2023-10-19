@@ -64,7 +64,7 @@ import (
 )
 
 const (
-	Version = "1.19.0"
+	Version = "1.21.0"
 )
 
 var dumpDocsCommand = &commands.DumpDocsCmd{}
@@ -143,7 +143,6 @@ var commandsWithoutCliCtx = []cli.Command{
 	commands.ReadTablesCmd{},
 	commands.GarbageCollectionCmd{},
 	commands.FilterBranchCmd{},
-	commands.MergeBaseCmd{},
 	commands.RootsCmd{},
 	commands.VersionCmd{VersionStr: Version},
 	commands.DumpCmd{},

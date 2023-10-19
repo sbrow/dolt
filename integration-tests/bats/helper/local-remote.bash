@@ -21,7 +21,6 @@ SKIP_SERVER_TESTS=$(cat <<-EOM
 ~sql-local-remote.bats~
 ~1pk5col-strings.bats~
 ~sql-tags.bats~
-~sql-pull.bats~
 ~empty-repo.bats~
 ~verify-constraints.bats~
 ~db-revision-specifiers.bats~
@@ -79,6 +78,7 @@ SKIP_SERVER_TESTS=$(cat <<-EOM
 ~sql-server-remotesrv.bats~
 ~large-update.bats~
 ~remotes.bats~
+~remotes-push-pull.bats~
 ~create-views.bats~
 ~blame.bats~
 ~multiple-tables.bats~

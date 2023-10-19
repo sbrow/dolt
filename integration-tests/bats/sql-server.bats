@@ -852,6 +852,11 @@ SQL
     [ $status -ne 0 ]
     [[ $output =~ "read-only" ]] || false
 
+    # dolt checkout can't create new branches on a read only database
+    run dolt sql-client --use-db "repo1/$hash" -u dolt -P $PORT -q "call dolt_checkout('-b', 'newBranch');"
+    [ $status -ne 0 ]
+    [[ $output =~ "unable to create new branch in a read-only database" ]] || false
+
     # server should still be alive after an error
     run dolt sql-client --use-db "repo1/$hash" -u dolt -P $PORT -q "select count(*) from test"
     [ $status -eq 0 ]
@@ -1073,7 +1078,7 @@ END""")
 
     run dolt sql-client -P $PORT -u dolt --use-db repo1 -q "call  dolt_push()"
     [ $status -ne 0 ]
-    [[ "$output" =~ "the current branch has no upstream branch" ]] || false
+    [[ "$output" =~ "The current branch main has no upstream branch" ]] || false
 
     dolt sql-client -P $PORT -u dolt --use-db repo1 -q "call dolt_push('--set-upstream', 'origin', 'main')"
 
