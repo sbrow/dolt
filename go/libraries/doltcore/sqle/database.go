@@ -375,7 +375,7 @@ func (db Database) getTableInsensitive(ctx *sql.Context, head *doltdb.Commit, ds
 			}
 		}
 
-		dt, found = dtables.NewLogTable(ctx, db.ddb, head), true
+		dt, found = dtables.NewLogTable(ctx, db.RevisionQualifiedName(), db.ddb, head), true
 	case doltdb.DiffTableName:
 		if head == nil {
 			var err error
@@ -409,9 +409,9 @@ func (db Database) getTableInsensitive(ctx *sql.Context, head *doltdb.Commit, ds
 	case doltdb.RemotesTableName:
 		dt, found = dtables.NewRemotesTable(ctx, db.ddb), true
 	case doltdb.CommitsTableName:
-		dt, found = dtables.NewCommitsTable(ctx, db.ddb), true
+		dt, found = dtables.NewCommitsTable(ctx, db.RevisionQualifiedName(), db.ddb), true
 	case doltdb.CommitAncestorsTableName:
-		dt, found = dtables.NewCommitAncestorsTable(ctx, db.ddb), true
+		dt, found = dtables.NewCommitAncestorsTable(ctx, db.RevisionQualifiedName(), db.ddb), true
 	case doltdb.StatusTableName:
 		sess := dsess.DSessFromSess(ctx.Session)
 		adapter := dsess.NewSessionStateAdapter(
@@ -673,7 +673,15 @@ func (db Database) GetTableNames(ctx *sql.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return filterDoltInternalTables(tblNames), nil
+	showSystemTables, err := ctx.GetSessionVariable(ctx, dsess.ShowSystemTables)
+	if err != nil {
+		return nil, err
+	}
+	if showSystemTables.(int8) == 1 {
+		return tblNames, nil
+	} else {
+		return filterDoltInternalTables(tblNames), nil
+	}
 }
 
 // GetAllTableNames returns all user-space tables, including system tables in user space
@@ -689,7 +697,13 @@ func (db Database) GetAllTableNames(ctx *sql.Context) ([]string, error) {
 }
 
 func getAllTableNames(ctx context.Context, root *doltdb.RootValue) ([]string, error) {
-	return root.GetTableNames(ctx)
+	systemTables, err := doltdb.GetGeneratedSystemTables(ctx, root)
+	if err != nil {
+		return nil, err
+	}
+	result, err := root.GetTableNames(ctx)
+	result = append(result, systemTables...)
+	return result, err
 }
 
 func filterDoltInternalTables(tblNames []string) []string {

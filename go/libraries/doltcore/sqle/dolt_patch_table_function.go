@@ -215,7 +215,7 @@ func (p *PatchTableFunction) IndexedAccess(lookup sql.IndexLookup) sql.IndexedTa
 
 func (p *PatchTableFunction) GetIndexes(ctx *sql.Context) ([]sql.Index, error) {
 	return []sql.Index{
-		index.MockIndex(diffTypeColumnName, p.Name(), types.StringKind, false),
+		index.MockIndex(p.database.Name(), p.Name(), diffTypeColumnName, types.StringKind, false),
 	}, nil
 }
 
@@ -313,8 +313,8 @@ func (p *PatchTableFunction) CheckPrivileges(ctx *sql.Context, opChecker sql.Pri
 			return false
 		}
 
-		return opChecker.UserHasPrivileges(ctx,
-			sql.NewPrivilegedOperation(p.database.Name(), tableName, "", sql.PrivilegeType_Select))
+		subject := sql.PrivilegeCheckSubject{Database: p.database.Name(), Table: tableName}
+		return opChecker.UserHasPrivileges(ctx, sql.NewPrivilegedOperation(subject, sql.PrivilegeType_Select))
 	}
 
 	tblNames, err := p.database.GetTableNames(ctx)
@@ -322,9 +322,10 @@ func (p *PatchTableFunction) CheckPrivileges(ctx *sql.Context, opChecker sql.Pri
 		return false
 	}
 
-	var operations []sql.PrivilegedOperation
+	operations := make([]sql.PrivilegedOperation, 0, len(tblNames))
 	for _, tblName := range tblNames {
-		operations = append(operations, sql.NewPrivilegedOperation(p.database.Name(), tblName, "", sql.PrivilegeType_Select))
+		subject := sql.PrivilegeCheckSubject{Database: p.database.Name(), Table: tblName}
+		operations = append(operations, sql.NewPrivilegedOperation(subject, sql.PrivilegeType_Select))
 	}
 
 	return opChecker.UserHasPrivileges(ctx, operations...)
@@ -527,7 +528,7 @@ func getSchemaSqlPatch(ctx *sql.Context, toRoot *doltdb.RootValue, td diff.Table
 	if td.IsDrop() {
 		ddlStatements = append(ddlStatements, sqlfmt.DropTableStmt(td.FromName))
 	} else if td.IsAdd() {
-		toPkSch, err := sqlutil.FromDoltSchema(td.ToName, td.ToSch)
+		toPkSch, err := sqlutil.FromDoltSchema("", td.ToName, td.ToSch)
 		if err != nil {
 			return nil, err
 		}
@@ -572,7 +573,7 @@ func getUserTableDataSqlPatch(ctx *sql.Context, dbData env.DbData, td diff.Table
 		return nil, err
 	}
 
-	targetPkSch, err := sqlutil.FromDoltSchema(td.ToName, td.ToSch)
+	targetPkSch, err := sqlutil.FromDoltSchema("", td.ToName, td.ToSch)
 	if err != nil {
 		return nil, err
 	}
@@ -721,7 +722,7 @@ func getDiffQuery(ctx *sql.Context, dbData env.DbData, td diff.TableDelta, fromR
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	diffPKSch, err := sqlutil.FromDoltSchema("", diffTableSchema)
+	diffPKSch, err := sqlutil.FromDoltSchema("", "", diffTableSchema)
 	if err != nil {
 		return nil, nil, nil, err
 	}
